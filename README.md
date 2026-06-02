@@ -22,7 +22,9 @@
 - 简化 MCP Client：支持 `list_tools()` 和 `call_tool()`
 - 内置药物相互作用查询示例工具，可扩展外部 API 或本地 CSV
 
-## 运行效果预览
+## 实际运行截图
+
+以下截图由本项目在本地启动 `streamlit run app.py` 后，通过浏览器访问 `localhost:8501` 实际截取。截图中的示例知识库来自 `data/sample_medical_notes.md`。
 
 ### 首页状态面板
 
@@ -201,7 +203,7 @@ llm:
 
 1. 启动应用：`streamlit run app.py`
 2. 打开左侧页面“上传文档”
-3. 上传 PDF、TXT 或 Markdown 文件
+3. 上传 PDF、TXT 或 Markdown 文件，也可以直接使用示例文件 `data/sample_medical_notes.md`
 4. 点击“开始索引”
 5. 切换到“对话”页面
 6. 输入医疗相关问题

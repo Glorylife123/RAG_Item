@@ -27,12 +27,6 @@ def init_state() -> None:
             chunk_overlap=int(app_cfg.get("chunk_overlap", 50)),
         )
 
-    if "vector_store" not in st.session_state:
-        st.session_state.vector_store = VectorStore(
-            persist_dir=config["app"]["chroma_dir"],
-            embedding_model=config["embedding"].get("model_name", "BAAI/bge-small-zh-v1.5"),
-        )
-
     if "bm25_store" not in st.session_state:
         st.session_state.bm25_store = BM25Store(config["app"]["bm25_path"])
 
@@ -59,7 +53,7 @@ def init_state() -> None:
 def get_retriever() -> HybridRetriever:
     cfg = st.session_state.config["app"]
     return HybridRetriever(
-        vector_store=st.session_state.vector_store,
+        vector_store=get_vector_store(),
         bm25_store=st.session_state.bm25_store,
         vector_top_k=int(cfg.get("vector_top_k", 10)),
         bm25_top_k=int(cfg.get("bm25_top_k", 10)),
@@ -80,7 +74,7 @@ def index_uploaded_file(uploaded_file) -> tuple[str, int]:
 
     # Same chunk IDs are written into Chroma and BM25, which keeps RRF fusion
     # deterministic and makes deletion a single document_id operation.
-    st.session_state.vector_store.add_chunks(chunks)
+    get_vector_store().add_chunks(chunks)
     st.session_state.bm25_store.add_chunks(
         [
             BM25Chunk(
@@ -96,7 +90,7 @@ def index_uploaded_file(uploaded_file) -> tuple[str, int]:
 
 
 def delete_document(document_id: str) -> None:
-    st.session_state.vector_store.delete_document(document_id)
+    get_vector_store().delete_document(document_id)
     st.session_state.bm25_store.delete_document(document_id)
 
 
@@ -108,3 +102,13 @@ def make_document_id(filename: str, content: bytes) -> str:
     stem = Path(filename).stem.replace(" ", "_")
     digest = hashlib.sha1(content).hexdigest()[:12]
     return f"{stem}_{digest}"
+
+
+def get_vector_store() -> VectorStore:
+    if "vector_store" not in st.session_state:
+        config = st.session_state.config
+        st.session_state.vector_store = VectorStore(
+            persist_dir=config["app"]["chroma_dir"],
+            embedding_model=config["embedding"].get("model_name", "BAAI/bge-small-zh-v1.5"),
+        )
+    return st.session_state.vector_store

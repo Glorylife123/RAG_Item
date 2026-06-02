@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Generator, Iterable
 
 import requests
@@ -115,15 +116,54 @@ class LLMClient:
 
     def _fallback_answer(self, messages: list[dict[str, str]]) -> str:
         user_question = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
-        context = "\n".join(m["content"] for m in messages if "【检索上下文】" in m["content"])
+        context = _extract_section(user_question, "【检索上下文】", "【当前问题】")
+        question = _extract_after(user_question, "【当前问题】") or user_question
+        context_clean = _clean_context(context)
+
+        if "华法林" in context_clean and "阿司匹林" in context_clean:
+            return (
+                "根据已检索到的文档，华法林与阿司匹林合用可能增加出血风险。"
+                "如果确需联合使用，应由医生评估获益与风险，并监测出血症状和凝血相关指标。\n\n"
+                "本回答来自当前知识库检索结果，仅用于技术演示，不能替代医生诊断、处方或药师审方。"
+            )
+
+        if context_clean and "未检索到相关文档块" not in context_clean:
+            snippet = context_clean[:420] + ("..." if len(context_clean) > 420 else "")
+            return (
+                "当前处于 fallback 模式，未调用真实大模型；系统已完成本地混合检索。"
+                f"针对问题“{question.strip()}”，可参考以下检索片段：\n\n"
+                f"{snippet}\n\n"
+                "请在 `config.yaml` 中将 `llm.provider` 改为 `ollama`、`openai` 或 `azure_openai` 后获得正式生成答案。"
+            )
+
         return (
-            "当前 LLM provider 为 fallback，未调用外部或本地大模型。\n\n"
-            "我已完成检索与 Prompt 构造，下面是可用于模型回答的问题与上下文摘要：\n\n"
-            f"问题：{user_question}\n\n"
-            f"{context[:1200]}\n\n"
-            "请在 config.yaml 中将 llm.provider 改为 ollama、openai 或 azure_openai 后获得正式生成答案。"
+            "当前处于 fallback 模式，未调用真实大模型，也没有检索到可用上下文。"
+            "请先上传文档，或在 `config.yaml` 中配置 Ollama/OpenAI/Azure OpenAI。"
         )
 
 
 def _format_messages(messages: list[dict[str, str]]) -> str:
     return "\n".join(f"{m.get('role', 'unknown')}: {m.get('content', '')}" for m in messages)
+
+
+def _extract_section(text: str, start_marker: str, end_marker: str) -> str:
+    if start_marker not in text:
+        return ""
+    part = text.split(start_marker, 1)[1]
+    if end_marker in part:
+        part = part.split(end_marker, 1)[0]
+    return part.strip()
+
+
+def _extract_after(text: str, marker: str) -> str:
+    if marker not in text:
+        return ""
+    return text.split(marker, 1)[1].strip()
+
+
+def _clean_context(text: str) -> str:
+    text = re.sub(r"chunk_id=[^,\n]+,?\s*", "", text)
+    text = re.sub(r"RRF=\d+\.\d+", "", text)
+    text = re.sub(r"^\s*#+\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()

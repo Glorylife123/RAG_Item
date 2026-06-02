@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import html
+
 import streamlit as st
 
 from core.app_state import get_retriever, index_uploaded_file, init_state
+from core.ui import apply_theme, hero, mini_stats
 
 
 SYSTEM_PROMPT = """你是一个谨慎的医疗 RAG 助手。
@@ -37,8 +40,27 @@ def format_tools(tools: list[dict[str, str]], enabled: list[str]) -> str:
 
 st.set_page_config(page_title="对话", page_icon="💬", layout="wide")
 init_state()
+apply_theme()
 
-st.title("对话")
+docs = st.session_state.bm25_store.list_documents()
+token_est = st.session_state.memory_compressor.estimate_tokens(st.session_state.messages)
+
+hero(
+    "HYBRID RETRIEVAL CHAT",
+    "医疗知识库对话",
+    "输入问题后，系统会融合向量语义召回与 BM25 关键词召回，结合压缩后的对话记忆构造 Prompt，并在回答后展示引用来源。",
+)
+
+mini_stats(
+    [
+        ("可检索文档", str(len(docs))),
+        ("文本块", str(len(st.session_state.bm25_store.chunks))),
+        ("会话 tokens", str(token_est)),
+        ("最终上下文", f"Top {st.session_state.config['app'].get('final_top_k', 5)}"),
+    ]
+)
+
+st.write("")
 
 with st.sidebar:
     st.header("外部工具")
@@ -51,7 +73,6 @@ with st.sidebar:
 
     st.divider()
     st.header("会话记忆")
-    token_est = st.session_state.memory_compressor.estimate_tokens(st.session_state.messages)
     st.metric("估算 tokens", token_est)
     st.metric("压缩阈值", st.session_state.config["memory"].get("max_tokens", 2000))
     if st.button("清空对话"):
@@ -59,20 +80,29 @@ with st.sidebar:
         st.session_state.memory_summary = ""
         st.rerun()
 
-with st.expander("📎 上传文件并自动索引", expanded=False):
-    direct_files = st.file_uploader(
-        "选择要加入当前知识库的文件",
-        type=["pdf", "txt", "md", "markdown"],
-        accept_multiple_files=True,
-        key="chat_upload",
-    )
-    if direct_files and st.button("上传并索引", type="primary"):
-        for uploaded in direct_files:
-            try:
-                document_id, chunk_count = index_uploaded_file(uploaded)
-                st.success(f"{uploaded.name} 已索引：{chunk_count} 个文本块。ID: {document_id}")
-            except Exception as exc:
-                st.error(f"{uploaded.name} 索引失败：{exc}")
+upload_col, guide_col = st.columns([1.1, 1])
+with upload_col:
+    with st.expander("上传文件并自动索引", expanded=False):
+        direct_files = st.file_uploader(
+            "选择要加入当前知识库的文件",
+            type=["pdf", "txt", "md", "markdown"],
+            accept_multiple_files=True,
+            key="chat_upload",
+        )
+        if direct_files and st.button("上传并索引", type="primary", use_container_width=True):
+            for uploaded in direct_files:
+                try:
+                    document_id, chunk_count = index_uploaded_file(uploaded)
+                    st.success(f"{uploaded.name} 已索引：{chunk_count} 个文本块。ID: {document_id}")
+                except Exception as exc:
+                    st.error(f"{uploaded.name} 索引失败：{exc}")
+with guide_col:
+    st.info("示例问题：warfarin 和 aspirin 能一起用吗？或：这份指南里高血压合并糖尿病如何处理？")
+
+if not st.session_state.messages:
+    with st.container(border=True):
+        st.markdown("**对话尚未开始**")
+        st.caption("上传文档后提问，或直接测试内置药物相互作用工具。回答下方会显示 RRF 融合后的引用来源。")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -133,13 +163,18 @@ if prompt:
             placeholder.markdown(answer)
 
         if retrieved:
-            with st.expander("引用来源"):
+            with st.expander("引用来源", expanded=True):
                 for idx, chunk in enumerate(retrieved, start=1):
                     st.markdown(
-                        f"**[{idx}] {chunk.filename}** "
-                        f"(RRF={chunk.fused_score:.4f}, vec_rank={chunk.vector_rank}, bm25_rank={chunk.bm25_rank})"
+                        f"""
+                        <div class="rag-source">
+                          <div class="rag-source-title">[{idx}] {html.escape(chunk.filename)}</div>
+                          <div class="rag-source-meta">RRF={chunk.fused_score:.4f} · vec_rank={chunk.vector_rank} · bm25_rank={chunk.bm25_rank}</div>
+                          <div class="rag-source-text">{html.escape(chunk.text[:420])}{"..." if len(chunk.text) > 420 else ""}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
                     )
-                    st.caption(chunk.text[:300] + ("..." if len(chunk.text) > 300 else ""))
 
         if compressed:
             st.caption("已触发会话记忆压缩：早期对话已写入摘要，最近 2 轮原文保留。")
