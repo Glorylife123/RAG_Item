@@ -1,0 +1,6 @@
+drug_a,drug_b,severity,description,recommendation
+warfarin,aspirin,high,华法林与阿司匹林合用可能增加出血风险。,避免自行合用；若必须合用应由医生评估并监测凝血和出血症状。
+warfarin,ibuprofen,high,华法林与布洛芬合用可能增加胃肠道出血风险。,优先咨询医生选择替代镇痛方案。
+metformin,contrast media,moderate,二甲双胍与含碘造影剂相关场景下可能增加乳酸酸中毒风险，尤其肾功能受损者。,造影前后是否暂停用药需由医生根据肾功能决定。
+simvastatin,clarithromycin,high,辛伐他汀与克拉霉素合用可升高肌病或横纹肌溶解风险。,通常应避免合用，医生可考虑暂停他汀或换用替代抗菌药。
+nitroglycerin,sildenafil,high,硝酸甘油与西地那非合用可能导致严重低血压。,禁忌合用；若误服或出现胸痛、头晕应立即就医。

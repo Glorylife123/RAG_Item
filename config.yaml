@@ -1,0 +1,36 @@
+app:
+  title: "本地医疗 RAG 问答系统"
+  chroma_dir: "./chroma_db"
+  bm25_path: "./data/bm25_store.json"
+  chunk_size: 500
+  chunk_overlap: 50
+  vector_top_k: 10
+  bm25_top_k: 10
+  final_top_k: 5
+  rrf_k: 60
+
+embedding:
+  model_name: "BAAI/bge-small-zh-v1.5"
+
+llm:
+  # provider 可选: fallback, ollama, openai, azure_openai
+  provider: "fallback"
+  model: "qwen2.5:7b"
+  temperature: 0.2
+  max_tokens: 1200
+  ollama_base_url: "http://localhost:11434"
+  openai_base_url: ""
+  openai_api_key: ""
+  azure_endpoint: ""
+  azure_api_key: ""
+  azure_api_version: "2024-06-01"
+  azure_deployment: ""
+
+memory:
+  max_tokens: 2000
+  keep_recent_turns: 2
+
+tools:
+  drug_interaction:
+    enabled: true
+    local_csv: "./data/drug_interactions.csv"
