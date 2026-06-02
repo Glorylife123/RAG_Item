@@ -5,6 +5,7 @@ import html
 import streamlit as st
 
 from core.app_state import get_retriever, index_uploaded_file, init_state
+from core.settings import render_llm_settings
 from core.ui import apply_theme, hero, mini_stats
 
 
@@ -79,6 +80,9 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.memory_summary = ""
         st.rerun()
+
+    st.divider()
+    render_llm_settings()
 
 upload_col, guide_col = st.columns([1.1, 1])
 with upload_col:

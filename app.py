@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from core.app_state import init_state
+from core.settings import effective_config, render_llm_settings
 from core.ui import apply_theme, card, hero, mini_stats, pills
 
 
@@ -18,7 +19,7 @@ apply_theme()
 
 docs = st.session_state.bm25_store.list_documents()
 chunk_count = len(st.session_state.bm25_store.chunks)
-provider = st.session_state.config["llm"].get("provider", "fallback")
+provider = effective_config()["llm"].get("provider", "fallback")
 
 hero(
     "LOCAL MEDICAL RAG",
@@ -65,3 +66,5 @@ with st.sidebar:
     st.metric("已索引文档", len(docs))
     st.metric("文本块", chunk_count)
     st.write("LLM Provider:", provider)
+    st.divider()
+    render_llm_settings()

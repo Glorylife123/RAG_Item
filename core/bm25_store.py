@@ -73,13 +73,22 @@ class BM25Store:
         tokens = self.tokenize(query)
         if not tokens:
             return []
-        scores = self._bm25.get_scores(tokens)
+        raw_scores = self._bm25.get_scores(tokens)
+        query_terms = set(tokens)
+        overlap_scores = np.array(
+            [len(query_terms.intersection(doc_tokens)) for doc_tokens in self._tokenized_corpus],
+            dtype=float,
+        )
+        # In tiny corpora, BM25 IDF can be zero or negative for matching terms.
+        # A small lexical-overlap fallback keeps local demos and small document
+        # sets from ranking non-matching chunks above exact keyword hits.
+        scores = np.maximum(raw_scores, 0) + overlap_scores * 1e-6
         ranked = np.argsort(scores)[::-1][:top_k]
         results = []
         for rank, idx in enumerate(ranked, start=1):
-            score = float(scores[idx])
-            if score <= 0:
+            if overlap_scores[idx] <= 0 and scores[idx] <= 0:
                 continue
+            score = float(scores[idx])
             chunk = self.chunks[int(idx)]
             results.append(
                 {

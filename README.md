@@ -17,6 +17,8 @@
 - `jieba` 中文分词 + `rank_bm25` BM25 检索
 - RRF Reciprocal Rank Fusion 融合向量检索与 BM25 结果
 - 回答后显示引用来源、RRF 分数、向量排名和 BM25 排名
+- 检索调试页：单独查看向量召回、BM25 召回和 RRF 融合结果
+- 侧边栏 LLM 配置：运行时切换 fallback、Ollama、OpenAI、Azure OpenAI，并测试连接
 - 会话超过 token 阈值后自动摘要压缩，保留最近 2 轮原文
 - 支持 Ollama、OpenAI 兼容接口、Azure OpenAI，也支持 fallback 模式验证检索链路
 - 简化 MCP Client：支持 `list_tools()` 和 `call_tool()`
@@ -69,7 +71,8 @@ medical_rag/
 ├── app.py                         # Streamlit 主入口
 ├── pages/
 │   ├── 1_上传文档.py              # 文档上传、索引、删除
-│   └── 2_对话.py                  # 聊天、直接上传、检索问答、工具开关
+│   ├── 2_对话.py                  # 聊天、直接上传、检索问答、工具开关
+│   └── 3_检索调试.py              # 向量/BM25/RRF 检索调试
 ├── core/
 │   ├── app_state.py               # Streamlit session_state 初始化与索引同步
 │   ├── bm25_store.py              # BM25 索引维护与持久化
@@ -79,6 +82,8 @@ medical_rag/
 │   ├── llm_client.py              # Ollama/OpenAI/Azure/fallback LLM 封装
 │   ├── mcp_client.py              # 简化 MCP Client 与 tool_call 解析
 │   ├── memory_compressor.py       # 会话记忆压缩
+│   ├── settings.py                # LLM 运行时配置与连接测试
+│   ├── ui.py                      # Streamlit 全局样式与 UI 组件
 │   └── vector_store.py            # Chroma 向量库封装
 ├── tools/
 │   ├── drug_interaction.py        # 药物相互作用查询示例
@@ -87,6 +92,7 @@ medical_rag/
 │   └── drug_interactions.csv      # 本地药物相互作用示例数据
 ├── docs/
 │   └── screenshots/               # README 截图
+├── tests/                         # pytest 单元测试
 ├── config.yaml                    # 应用配置
 ├── requirements.txt               # Python 依赖
 └── README.md
@@ -158,6 +164,8 @@ llm:
 ```
 
 fallback 不调用真实大模型，但会展示检索到的上下文和 Prompt 构造结果，适合先验证上传、索引、RRF 和引用展示。
+
+也可以直接在应用侧边栏的“LLM 配置”中切换 provider、模型名、temperature 和 max tokens。侧边栏配置只影响当前 Streamlit 会话，不会覆盖 `config.yaml`。
 
 ### 使用 Ollama
 
@@ -235,6 +243,23 @@ score(d) = sum(1 / (rrf_k + rank_r(d)))
 ```text
 core/hybrid_retriever.py
 ```
+
+## 检索调试页
+
+左侧进入“检索调试”后，可以输入任意 query，并分别查看：
+
+- RRF 融合后的 top results
+- Chroma 向量检索结果和 distance
+- BM25 检索结果和 BM25 score
+
+侧边栏可以临时调节：
+
+- 向量 `top_k`
+- BM25 `top_k`
+- 融合 `top_k`
+- `rrf_k`
+
+这对于排查“为什么没召回”“关键词是否命中”“RRF 是否把双路命中文档排到前面”非常有用。
 
 ## 如何测试 RRF 效果
 
@@ -383,6 +408,20 @@ data/bm25_store.json
 ```bash
 python -m compileall core pages app.py
 ```
+
+运行单元测试：
+
+```bash
+pytest
+```
+
+当前测试覆盖：
+
+- 文档分块和稳定 chunk ID
+- BM25 增删、搜索和小语料排序稳定性
+- RRF 融合排序
+- MCP 工具调用解析
+- 会话记忆压缩触发
 
 RRF 最小测试：
 
